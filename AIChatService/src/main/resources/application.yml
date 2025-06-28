@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+
+deepseek:
+    MODEL: deepseek-chat
+#    MODEL: deepseek-reasoner
+    API_URL: https://api.deepseek.com/chat/completions
+    API_KEY: sk-28c97568f980448da9a162069cc789e2
+
+
+
