@@ -17,5 +17,5 @@ public class SendMessage {
     // 发送人邮箱
     private String sendEmail;
     // 发送信息内容
-    private String content;
+    private Object content;
 }

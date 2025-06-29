@@ -1,10 +1,10 @@
 package com.aichatservice.service.Impl;
 
 import com.aichatservice.service.ChatService;
-import com.aichatservice.utils.DeepSeekChatUtil;
-import com.aichatservice.utils.DeepSeekProperties;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.aichatservice.utils.WeiBoHotsUtil;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * @author tengyue
@@ -13,12 +13,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class ChatServiceImpl implements ChatService {
 
-    @Autowired
-    private DeepSeekProperties deepSeekProperties;
 
     @Override
-    public void aiChat(String message) {
-        DeepSeekChatUtil.streamChatCompletion(deepSeekProperties.getMODEL(), deepSeekProperties.getAPI_URL(),
-                deepSeekProperties.getAPI_KEY(), message);
+    public List<String> getHots() {
+        return WeiBoHotsUtil.GetWeiBoHots();
     }
 }

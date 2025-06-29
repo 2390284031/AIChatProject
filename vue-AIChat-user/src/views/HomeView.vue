@@ -7,10 +7,9 @@ import type {
 } from 'ant-design-x-vue'
 import { onBeforeUnmount, onMounted, type VNode } from 'vue'
 import {
-  CloudUploadOutlined,
   EllipsisOutlined,
   FireOutlined,
-  PaperClipOutlined,
+  CoffeeOutlined,
   PlusOutlined,
   ShareAltOutlined,
   UserOutlined
@@ -27,6 +26,7 @@ import {
 import { computed, h, ref } from 'vue'
 import websocket from '@/utils/websocket.ts'
 import { VITE_HOST_URL } from '../../env.d.ts'
+import { getHots } from '@/api/api.ts'
 
 const { token } = theme.useToken()
 
@@ -66,6 +66,7 @@ const styles = computed(() => {
     },
     messages: {
       flex: 1,
+      whiteSpace: 'pre-wrap'
     },
     placeholder: {
       'padding-top': '32px',
@@ -101,6 +102,13 @@ const styles = computed(() => {
       width: 'calc(100% - 24px)',
       margin: '0 12px 24px 12px',
     },
+    prompts: {
+      width: '100%',
+      display: 'flex',
+      'align-items': 'center',
+      'justify-content': 'center',
+      'margin-bottom': '10px'
+    }
   } as const
 })
 
@@ -117,7 +125,7 @@ const defaultConversationsItems = [
   },
 ]
 
-const placeholderPromptsItems: PromptsProps['items'] = [
+const placeholderPromptsItems = ref<PromptsProps['items']>([
   {
     key: '1',
     label: renderTitle(h(FireOutlined, { style: { color: '#FF4D4F' } }), '热点话题'),
@@ -136,16 +144,20 @@ const placeholderPromptsItems: PromptsProps['items'] = [
         description: `社会文化`,
       },
       {
-        key: '1-3',
+        key: '1-4',
         description: `"一带一路"十周年`,
       },
       {
-        key: '1-3',
+        key: '1-5',
         description: `科技与文化`,
+      },
+      {
+        key: '1-6',
+        description: `AI发展迅速`,
       },
     ],
   },
-]
+])
 
 const senderPromptsItems: PromptsProps['items'] = [
   {
@@ -189,8 +201,6 @@ interface Item{
   loading: boolean
 }
 
-// ==================== Event ====================
-
 const onPromptsItemClick: PromptsProps['onItemClick'] = (info) => {
   sendMessage(info.data.description as string)
 }
@@ -229,7 +239,7 @@ const placeholderNode = computed(() =>
     }),
     h(Prompts, {
       title: '想要做什么?',
-      items: placeholderPromptsItems,
+      items: placeholderPromptsItems.value,
       styles: {
         list: {
           width: '100%',
@@ -242,6 +252,15 @@ const placeholderNode = computed(() =>
     }),
   ]),
 )
+
+const PromptsItems: PromptsProps['items'] = [
+  {
+    key: '1',
+    icon: h(CoffeeOutlined, { style: { color: '#964B00' } }),
+    label: "AI聊天对话管理",
+    description: '功能完善中...',
+  },
+];
 
 function onSubmit() {
   sendMessage(content.value)
@@ -262,7 +281,7 @@ const sendMessage = (text: string) => {
       key: itemList.value.length,
       role: 'user',
       content: text,
-      loading: false
+      loading: false,
     })
     index.value = itemList.value.length
     itemList.value[index.value] = {
@@ -271,12 +290,23 @@ const sendMessage = (text: string) => {
       content: msg.value,
       loading: true
     }
-    websocket.sendMessage(text.toString())
+    websocket.sendMessage(text.toString(), email)
   }
 }
+const email = (Math.floor(Math.random() * 1000) + 1).toString()
 onMounted(() => {
-  websocket.connect("ws://" + VITE_HOST_URL + "/websocket/" + 1)
+  websocket.connect("ws://" + VITE_HOST_URL + "/websocket/" + email)
   websocket.handleMessage = handleMessage
+
+  // 获取热点信息
+  getHots().then((res) => {
+    console.log(res)
+    if (res.data.code === 1){
+      for (let i = 0; i < 6; i++){
+        placeholderPromptsItems.value[0].children[i].description = res.data.data[i]
+      }
+    }
+  })
 })
 
 onBeforeUnmount(() => {
@@ -287,20 +317,26 @@ onBeforeUnmount(() => {
 const msg = ref('')
 const handleMessage = (data) => {
   const parsedData = JSON.parse(data.toString());
-  // console.log("[服务器]" + parsedData.content)
   msg.value = msg.value + parsedData.content
-  if (parsedData.content === "[DONE]"){
-    agentRequestLoading.value = false
-    msg.value = ''
-    return
-  } else {
-    itemList.value[index.value] = {
-      key: index.value,
-      role: parsedData.role,
-      content: msg.value,
-      loading: false
+  console.log(msg.value)
+  if (parsedData.role === "system"){
+    for (let i = 0; i < 6; i++){
+      placeholderPromptsItems.value[0].children[i].description = parsedData.content[i]
     }
-    agentRequestLoading.value = true
+  } else {
+    if (parsedData.content === "[DONE]"){
+      agentRequestLoading.value = false
+      msg.value = ''
+      return
+    } else {
+      itemList.value[index.value] = {
+        key: index.value,
+        role: parsedData.role,
+        content: msg.value,
+        loading: false
+      }
+      agentRequestLoading.value = true
+    }
   }
 }
 
@@ -313,6 +349,9 @@ const handleMessage = (data) => {
       <div :style="styles.logo">
         <img src="@/assets/ai_logo.png" draggable="false" alt="logo" :style="styles['logo-img']" />
         <span :style="styles['logo-span']">AI 聊天对话</span>
+      </div>
+      <div>
+        <Prompts title="" :items="PromptsItems" :style="styles.prompts"/>
       </div>
 
       <!-- 🌟 添加会话 -->
@@ -332,7 +371,7 @@ const handleMessage = (data) => {
 
     <div :style="styles.chat">
       <!-- 🌟 消息列表 -->
-      <Bubble.List :items="items" :roles="roles" :style="styles.messages" />
+      <Bubble.List :items="items" :roles="roles" :style="styles.messages"/>
 
       <!-- 🌟 提示词 -->
       <Prompts :items="senderPromptsItems" @item-click="onPromptsItemClick" />
@@ -345,53 +384,55 @@ const handleMessage = (data) => {
         @submit="onSubmit"
         @change="(value) => (content = value)"
       >
-        <template #prefix>
-          <Badge :dot="attachedFiles.length > 0 && !headerOpen">
-            <Button type="text" @click="() => (headerOpen = !headerOpen)">
-              <template #icon>
-                <PaperClipOutlined />
-              </template>
-            </Button>
-          </Badge>
-        </template>
 
-        <template #header>
-          <Sender.Header
-            title="Attachments"
-            :open="headerOpen"
-            :styles="{ content: { padding: 0 } }"
-            @open-change="(open) => (headerOpen = open)"
-          >
-            <Attachments
-              :before-upload="() => false"
-              :items="attachedFiles"
-              @change="handleFileChange"
-            >
-              <template #placeholder="type">
-                <Flex
-                  v-if="type && type.type === 'inline'"
-                  align="center"
-                  justify="center"
-                  vertical
-                  gap="2"
-                >
-                  <Typography.Text style="font-size: 30px; line-height: 1">
-                    <CloudUploadOutlined />
-                  </Typography.Text>
-                  <Typography.Title :level="5" style="margin: 0; font-size: 14px; line-height: 1.5">
-                    Upload files
-                  </Typography.Title>
-                  <Typography.Text type="secondary">
-                    Click or drag files to this area to upload
-                  </Typography.Text>
-                </Flex>
-                <Typography.Text v-if="type && type.type === 'drop'">
-                  Drop file here
-                </Typography.Text>
-              </template>
-            </Attachments>
-          </Sender.Header>
-        </template>
+<!--        文件上传，开发中....-->
+<!--        <template #prefix>-->
+<!--          <Badge :dot="attachedFiles.length > 0 && !headerOpen">-->
+<!--            <Button type="text" @click="() => (headerOpen = !headerOpen)">-->
+<!--              <template #icon>-->
+<!--                <PaperClipOutlined />-->
+<!--              </template>-->
+<!--            </Button>-->
+<!--          </Badge>-->
+<!--        </template>-->
+
+<!--        <template #header>-->
+<!--          <Sender.Header-->
+<!--            title="Attachments"-->
+<!--            :open="headerOpen"-->
+<!--            :styles="{ content: { padding: 0 } }"-->
+<!--            @open-change="(open) => (headerOpen = open)"-->
+<!--          >-->
+<!--            <Attachments-->
+<!--              :before-upload="() => false"-->
+<!--              :items="attachedFiles"-->
+<!--              @change="handleFileChange"-->
+<!--            >-->
+<!--              <template #placeholder="type">-->
+<!--                <Flex-->
+<!--                  v-if="type && type.type === 'inline'"-->
+<!--                  align="center"-->
+<!--                  justify="center"-->
+<!--                  vertical-->
+<!--                  gap="2"-->
+<!--                >-->
+<!--                  <Typography.Text style="font-size: 30px; line-height: 1">-->
+<!--                    <CloudUploadOutlined />-->
+<!--                  </Typography.Text>-->
+<!--                  <Typography.Title :level="5" style="margin: 0; font-size: 14px; line-height: 1.5">-->
+<!--                    Upload files-->
+<!--                  </Typography.Title>-->
+<!--                  <Typography.Text type="secondary">-->
+<!--                    Click or drag files to this area to upload-->
+<!--                  </Typography.Text>-->
+<!--                </Flex>-->
+<!--                <Typography.Text v-if="type && type.type === 'drop'">-->
+<!--                  Drop file here-->
+<!--                </Typography.Text>-->
+<!--              </template>-->
+<!--            </Attachments>-->
+<!--          </Sender.Header>-->
+<!--        </template>-->
       </Sender>
     </div>
   </div>

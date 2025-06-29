@@ -1,6 +1,8 @@
 package com.aichatservice.service;
 
+import java.util.List;
+
 public interface ChatService {
 
-    void aiChat(String message);
+    List<String> getHots();
 }

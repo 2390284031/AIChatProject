@@ -60,10 +60,10 @@ class WebSocketService {
   }
 
   // 发送消息
-  sendMessage(msg: string) {
+  sendMessage(msg: string, email: string) {
     const message = JSON.stringify({
       role: "user",
-      sendEmail: "1",
+      sendEmail: email,
       content: msg,
     });
     if (this.socket?.readyState === WebSocket.OPEN) {

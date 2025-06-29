@@ -20,6 +20,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -62,10 +64,8 @@ public class WebSocketServer {
     public void onMessage(String message) {
         System.out.println("[客户端]:" + message);
         SendMessage sendMessage = JSONObject.parseObject(message, SendMessage.class);
-
         deepSeekProperties = applicationContext.getBean(DeepSeekProperties.class);
-        streamChatCompletion(deepSeekProperties.getMODEL(), deepSeekProperties.getAPI_URL(),
-                deepSeekProperties.getAPI_KEY(), sendMessage.getContent(), sendMessage.getSendEmail());
+        streamChatCompletion(sendMessage.getContent().toString(), sendMessage.getSendEmail());
     }
 
     /**
@@ -81,24 +81,11 @@ public class WebSocketServer {
 
     /**
      * 流式调用DeepSeek API并实时处理返回结果
-     * @param model 使用的模型
-     * @param API_URL 请求地址
-     * @param API_KEY 密钥
      * @param message 问题信息
      * @param sendEmail
      */
-    public void streamChatCompletion(String model,String API_URL,String API_KEY,
-                                     String message, String sendEmail) {
+    public void streamChatCompletion(String message, String sendEmail) {
         OkHttpClient client = new OkHttpClient();
-
-        // 构建请求体
-//        String requestBody = "{\n" +
-//                "  \"model\": \""+model+"\",\n" +
-//                "  \"messages\": [\n" +
-//                "    {\"role\": \"user\", \"content\": \""+message+"\"}\n" +
-//                "  ],\n" +
-//                "  \"stream\": true\n" +
-//                "}";
         message = message.replace("\n", "\\n").replace("\"", "\\\"");
         String requestBody = String.format("""
                 {
@@ -108,12 +95,12 @@ public class WebSocketServer {
                   ],
                 "stream": true
                 }
-                """, model, message);
+                """, deepSeekProperties.getMODEL(), message);
 
         Request request = new Request.Builder()
-                .url(API_URL)
+                .url(deepSeekProperties.getAPI_URL())
                 .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + API_KEY)
+                .addHeader("Authorization", "Bearer " + deepSeekProperties.getAPI_KEY())
                 .build();
 
         // 创建EventSource监听器
@@ -131,7 +118,6 @@ public class WebSocketServer {
                             .get(0).getAsJsonObject()
                             .getAsJsonObject("delta")
                             .get("content").getAsString();
-
                     sendToAllClient(content, sendEmail);
                 }
             }
@@ -159,13 +145,26 @@ public class WebSocketServer {
      * @param message
      * @param sendEmail
      */
-    public void sendToAllClient(String message, String sendEmail) {
+    public <T> void sendToAllClient(T message, String sendEmail) {
         // 不等于null则向指定人发送信息
         if (sendEmail != null){
             Session session = sessionMap.get(sendEmail);
             if (session != null){
                 try {
                     SendMessage sendMessage = new SendMessage("ai", "null", message);
+                    String jsonString = JSONObject.toJSONString(sendMessage);
+                    session.getBasicRemote().sendText(jsonString);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            //否则向所有人发送信息（用于群发热点信息）
+            Collection<Session> sessions = sessionMap.values();
+            for (Session session : sessions) {
+                try {
+                    //服务器向客户端发送消息
+                    SendMessage sendMessage = new SendMessage("system", "null", message);
                     String jsonString = JSONObject.toJSONString(sendMessage);
                     session.getBasicRemote().sendText(jsonString);
                 } catch (Exception e) {

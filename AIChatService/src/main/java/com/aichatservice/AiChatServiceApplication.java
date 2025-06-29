@@ -5,9 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Slf4j
 @SpringBootApplication
+@EnableScheduling//开启任务调度
 public class AiChatServiceApplication {
 
     public static void main(String[] args) {
@@ -16,5 +18,4 @@ public class AiChatServiceApplication {
         WebSocketServer.setApplicationContext(context);
         log.info("项目启动成功");
     }
-
 }
